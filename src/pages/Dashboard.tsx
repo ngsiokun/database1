@@ -6,32 +6,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { LogOut, Save, Loader2, RefreshCw, User, Phone, Tag, FileText, Link as LinkIcon } from 'lucide-react';
+import { LogOut, Loader2, RefreshCw, User, Phone, Tag, FileText, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface MemberData {
-  id: string;
+interface UserData {
   email: string;
   tel: string;
   topic: string;
   keyword: string;
   title: string;
-  ig_link: string;
+  igLink: string;
+  rowIndex: number;
 }
 
 export default function Dashboard() {
   const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [memberData, setMemberData] = useState<MemberData | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    tel: '',
-    topic: '',
-    keyword: '',
-    title: '',
-    igLink: '',
-  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -40,69 +32,36 @@ export default function Dashboard() {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchMemberData();
+    if (user?.email) {
+      fetchUserData();
     }
   }, [user]);
 
-  const fetchMemberData = async () => {
-    if (!user?.id) return;
+  const fetchUserData = async () => {
+    if (!user?.email) return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke('google-sheets', {
+        body: {
+          action: 'read',
+          email: user.email,
+        },
+      });
 
       if (error) throw error;
 
-      if (data) {
-        setMemberData(data);
-        setFormData({
-          tel: data.tel || '',
-          topic: data.topic || '',
-          keyword: data.keyword || '',
-          title: data.title || '',
-          igLink: data.ig_link || '',
-        });
+      if (data.found && data.userData) {
+        setUserData(data.userData);
       } else {
-        setMemberData(null);
+        setUserData(null);
+        toast.info('在表格中找不到您的資料');
       }
     } catch (err) {
       console.error('Error fetching data:', err);
       toast.error('獲取資料失敗');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!memberData || !user?.id) return;
-
-    setSaving(true);
-    try {
-      const { error } = await supabase
-        .from('members')
-        .update({
-          tel: formData.tel,
-          topic: formData.topic,
-          keyword: formData.keyword,
-          title: formData.title,
-          ig_link: formData.igLink,
-        })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast.success('資料已更新！');
-      await fetchMemberData();
-    } catch (err) {
-      console.error('Error saving data:', err);
-      toast.error('儲存失敗，請稍後再試');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -147,12 +106,12 @@ export default function Dashboard() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="font-display text-xl">我的資料</CardTitle>
-                <CardDescription>查看和編輯您的會員資料</CardDescription>
+                <CardDescription>查看您在 Google Sheet 中的資料</CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={fetchMemberData}
+                onClick={fetchUserData}
                 disabled={loading}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -163,28 +122,28 @@ export default function Dashboard() {
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
-              ) : !memberData ? (
+              ) : !userData ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
                     <User className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground">
-                    找不到您的會員資料
+                    在表格中找不到您的電郵地址
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    請聯繫管理員
+                    請確認您使用的電郵與表格中的一致
                   </p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Email (read-only) */}
+                  {/* Email */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium flex items-center gap-2">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      電郵 (不可修改)
+                      電郵
                     </Label>
                     <Input
-                      value={memberData.email}
+                      value={userData.email}
                       disabled
                       className="bg-muted"
                     />
@@ -192,91 +151,72 @@ export default function Dashboard() {
 
                   {/* Tel */}
                   <div className="space-y-2">
-                    <Label htmlFor="tel" className="text-sm font-medium flex items-center gap-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
                       <Phone className="w-4 h-4 text-muted-foreground" />
                       電話
                     </Label>
                     <Input
-                      id="tel"
-                      value={formData.tel}
-                      onChange={(e) => setFormData({ ...formData, tel: e.target.value })}
-                      placeholder="輸入電話號碼"
+                      value={userData.tel}
+                      disabled
+                      className="bg-muted"
                     />
                   </div>
 
                   {/* Topic */}
                   <div className="space-y-2">
-                    <Label htmlFor="topic" className="text-sm font-medium flex items-center gap-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
                       <Tag className="w-4 h-4 text-muted-foreground" />
                       主題
                     </Label>
                     <Input
-                      id="topic"
-                      value={formData.topic}
-                      onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                      placeholder="輸入主題"
+                      value={userData.topic}
+                      disabled
+                      className="bg-muted"
                     />
                   </div>
 
                   {/* Keyword */}
                   <div className="space-y-2">
-                    <Label htmlFor="keyword" className="text-sm font-medium flex items-center gap-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
                       <Tag className="w-4 h-4 text-muted-foreground" />
                       關鍵字
                     </Label>
                     <Input
-                      id="keyword"
-                      value={formData.keyword}
-                      onChange={(e) => setFormData({ ...formData, keyword: e.target.value })}
-                      placeholder="輸入關鍵字"
+                      value={userData.keyword}
+                      disabled
+                      className="bg-muted"
                     />
                   </div>
 
                   {/* Title */}
                   <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm font-medium flex items-center gap-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
                       <FileText className="w-4 h-4 text-muted-foreground" />
                       標題
                     </Label>
                     <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="輸入標題"
+                      value={userData.title}
+                      disabled
+                      className="bg-muted"
                     />
                   </div>
 
                   {/* IG Link */}
                   <div className="space-y-2">
-                    <Label htmlFor="igLink" className="text-sm font-medium flex items-center gap-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
                       <LinkIcon className="w-4 h-4 text-muted-foreground" />
                       IG 連結
                     </Label>
                     <Input
-                      id="igLink"
-                      value={formData.igLink}
-                      onChange={(e) => setFormData({ ...formData, igLink: e.target.value })}
-                      placeholder="輸入 IG 連結"
+                      value={userData.igLink}
+                      disabled
+                      className="bg-muted"
                     />
                   </div>
 
-                  {/* Save Button */}
-                  <Button
-                    variant="gradient"
-                    className="w-full"
-                    size="lg"
-                    onClick={handleSave}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        儲存變更
-                      </>
-                    )}
-                  </Button>
+                  <p className="text-sm text-muted-foreground text-center pt-4">
+                    如需編輯資料，請直接在 Google Sheet 中修改
+                  </p>
                 </div>
               )}
             </CardContent>
