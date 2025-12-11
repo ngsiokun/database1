@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 const SPREADSHEET_ID = '1sV2nkeloZIZp6uVFaO-j_1NukbC69u-nkAy_qktDEYs';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw_x8sPwzp1AJM-gUQyhJ5IjeCiMIH6YWG999eMrtr9fNC4mGFqCQQ53Zy_BtPUu9CMhA/exec';
 
 async function readPublicSheet(): Promise<string[][]> {
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
@@ -52,13 +53,41 @@ async function readPublicSheet(): Promise<string[][]> {
   return rows;
 }
 
+async function updateGoogleSheet(data: {
+  email: string;
+  tel: string;
+  topic: string;
+  keyword: string;
+  title: string;
+  igLink: string;
+}): Promise<{ success: boolean; error?: string }> {
+  console.log('Updating Google Sheet via Apps Script:', data);
+  
+  try {
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    
+    const result = await response.json();
+    console.log('Apps Script response:', result);
+    return result;
+  } catch (error) {
+    console.error('Error calling Apps Script:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, email } = await req.json();
+    const { action, email, data } = await req.json();
     console.log(`Processing action: ${action} for email: ${email}`);
 
     if (action === 'read') {
@@ -103,6 +132,22 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+    }
+
+    if (action === 'update') {
+      const result = await updateGoogleSheet({
+        email,
+        tel: data.tel || '',
+        topic: data.topic || '',
+        keyword: data.keyword || '',
+        title: data.title || '',
+        igLink: data.igLink || '',
+      });
+      
+      return new Response(
+        JSON.stringify(result),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(

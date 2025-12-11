@@ -116,10 +116,11 @@ export default function Dashboard() {
   };
 
   const handleSave = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !user?.email) return;
 
     setSaving(true);
     try {
+      // Save to database
       const { error } = await supabase
         .from('members')
         .update({
@@ -133,7 +134,23 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      toast.success('資料已儲存！');
+      // Also sync to Google Sheets
+      const { data: sheetResult, error: sheetError } = await supabase.functions.invoke('google-sheets', {
+        body: {
+          action: 'update',
+          email: user.email,
+          data: formData,
+        },
+      });
+
+      if (sheetError) {
+        console.error('Google Sheets sync error:', sheetError);
+        toast.warning('已儲存到資料庫，但 Google Sheet 同步失敗');
+      } else if (sheetResult?.success) {
+        toast.success('資料已儲存並同步到 Google Sheet！');
+      } else {
+        toast.warning('已儲存到資料庫，但 Google Sheet 同步失敗');
+      }
       
       // Update local state
       setUserData(prev => prev ? {
