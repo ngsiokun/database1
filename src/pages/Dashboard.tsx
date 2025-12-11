@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { LogOut, Loader2, RefreshCw, User, Phone, Tag, FileText, Link as LinkIcon } from 'lucide-react';
+import { LogOut, Save, Loader2, RefreshCw, User, Phone, Tag, FileText, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UserData {
@@ -16,7 +16,6 @@ interface UserData {
   keyword: string;
   title: string;
   igLink: string;
-  rowIndex: number;
 }
 
 export default function Dashboard() {
@@ -24,6 +23,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    tel: '',
+    topic: '',
+    keyword: '',
+    title: '',
+    igLink: '',
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -38,30 +45,110 @@ export default function Dashboard() {
   }, [user]);
 
   const fetchUserData = async () => {
-    if (!user?.email) return;
+    if (!user?.email || !user?.id) return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('google-sheets', {
-        body: {
-          action: 'read',
-          email: user.email,
-        },
-      });
+      // First check if user has data in database
+      const { data: dbData, error: dbError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
-      if (data.found && data.userData) {
-        setUserData(data.userData);
+      // If database has data with content, use it
+      if (dbData && (dbData.tel || dbData.topic || dbData.keyword || dbData.title || dbData.ig_link)) {
+        setUserData({
+          email: dbData.email,
+          tel: dbData.tel || '',
+          topic: dbData.topic || '',
+          keyword: dbData.keyword || '',
+          title: dbData.title || '',
+          igLink: dbData.ig_link || '',
+        });
+        setFormData({
+          tel: dbData.tel || '',
+          topic: dbData.topic || '',
+          keyword: dbData.keyword || '',
+          title: dbData.title || '',
+          igLink: dbData.ig_link || '',
+        });
       } else {
-        setUserData(null);
-        toast.info('在表格中找不到您的資料');
+        // Otherwise fetch from Google Sheets
+        const { data, error } = await supabase.functions.invoke('google-sheets', {
+          body: {
+            action: 'read',
+            email: user.email,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data.found && data.userData) {
+          setUserData(data.userData);
+          setFormData({
+            tel: data.userData.tel || '',
+            topic: data.userData.topic || '',
+            keyword: data.userData.keyword || '',
+            title: data.userData.title || '',
+            igLink: data.userData.igLink || '',
+          });
+        } else {
+          // Create empty user data for new users
+          setUserData({
+            email: user.email,
+            tel: '',
+            topic: '',
+            keyword: '',
+            title: '',
+            igLink: '',
+          });
+        }
       }
     } catch (err) {
       console.error('Error fetching data:', err);
       toast.error('獲取資料失敗');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('members')
+        .update({
+          tel: formData.tel,
+          topic: formData.topic,
+          keyword: formData.keyword,
+          title: formData.title,
+          ig_link: formData.igLink,
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast.success('資料已儲存！');
+      
+      // Update local state
+      setUserData(prev => prev ? {
+        ...prev,
+        tel: formData.tel,
+        topic: formData.topic,
+        keyword: formData.keyword,
+        title: formData.title,
+        igLink: formData.igLink,
+      } : null);
+    } catch (err) {
+      console.error('Error saving data:', err);
+      toast.error('儲存失敗，請稍後再試');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -106,7 +193,7 @@ export default function Dashboard() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="font-display text-xl">我的資料</CardTitle>
-                <CardDescription>查看您在 Google Sheet 中的資料</CardDescription>
+                <CardDescription>查看和編輯您的資料</CardDescription>
               </div>
               <Button
                 variant="ghost"
@@ -128,19 +215,16 @@ export default function Dashboard() {
                     <User className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground">
-                    在表格中找不到您的電郵地址
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    請確認您使用的電郵與表格中的一致
+                    找不到您的資料
                   </p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Email */}
+                  {/* Email (read-only) */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium flex items-center gap-2">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      電郵
+                      電郵 (不可修改)
                     </Label>
                     <Input
                       value={userData.email}
@@ -151,72 +235,91 @@ export default function Dashboard() {
 
                   {/* Tel */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
+                    <Label htmlFor="tel" className="text-sm font-medium flex items-center gap-2">
                       <Phone className="w-4 h-4 text-muted-foreground" />
                       電話
                     </Label>
                     <Input
-                      value={userData.tel}
-                      disabled
-                      className="bg-muted"
+                      id="tel"
+                      value={formData.tel}
+                      onChange={(e) => setFormData({ ...formData, tel: e.target.value })}
+                      placeholder="輸入電話號碼"
                     />
                   </div>
 
                   {/* Topic */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
+                    <Label htmlFor="topic" className="text-sm font-medium flex items-center gap-2">
                       <Tag className="w-4 h-4 text-muted-foreground" />
                       主題
                     </Label>
                     <Input
-                      value={userData.topic}
-                      disabled
-                      className="bg-muted"
+                      id="topic"
+                      value={formData.topic}
+                      onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                      placeholder="輸入主題"
                     />
                   </div>
 
                   {/* Keyword */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
+                    <Label htmlFor="keyword" className="text-sm font-medium flex items-center gap-2">
                       <Tag className="w-4 h-4 text-muted-foreground" />
                       關鍵字
                     </Label>
                     <Input
-                      value={userData.keyword}
-                      disabled
-                      className="bg-muted"
+                      id="keyword"
+                      value={formData.keyword}
+                      onChange={(e) => setFormData({ ...formData, keyword: e.target.value })}
+                      placeholder="輸入關鍵字"
                     />
                   </div>
 
                   {/* Title */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
+                    <Label htmlFor="title" className="text-sm font-medium flex items-center gap-2">
                       <FileText className="w-4 h-4 text-muted-foreground" />
                       標題
                     </Label>
                     <Input
-                      value={userData.title}
-                      disabled
-                      className="bg-muted"
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="輸入標題"
                     />
                   </div>
 
                   {/* IG Link */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
+                    <Label htmlFor="igLink" className="text-sm font-medium flex items-center gap-2">
                       <LinkIcon className="w-4 h-4 text-muted-foreground" />
                       IG 連結
                     </Label>
                     <Input
-                      value={userData.igLink}
-                      disabled
-                      className="bg-muted"
+                      id="igLink"
+                      value={formData.igLink}
+                      onChange={(e) => setFormData({ ...formData, igLink: e.target.value })}
+                      placeholder="輸入 IG 連結"
                     />
                   </div>
 
-                  <p className="text-sm text-muted-foreground text-center pt-4">
-                    如需編輯資料，請直接在 Google Sheet 中修改
-                  </p>
+                  {/* Save Button */}
+                  <Button
+                    variant="gradient"
+                    className="w-full"
+                    size="lg"
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        儲存變更
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </CardContent>
