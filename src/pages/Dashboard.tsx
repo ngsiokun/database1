@@ -9,20 +9,20 @@ import { toast } from 'sonner';
 import { LogOut, Save, Loader2, RefreshCw, User, Phone, Tag, FileText, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-interface UserData {
+interface MemberData {
+  id: string;
   email: string;
   tel: string;
   topic: string;
   keyword: string;
   title: string;
-  igLink: string;
-  rowIndex: number;
+  ig_link: string;
 }
 
 export default function Dashboard() {
   const { user, signOut, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const [memberData, setMemberData] = useState<MemberData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,37 +40,35 @@ export default function Dashboard() {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user?.email) {
-      fetchUserData();
+    if (user?.id) {
+      fetchMemberData();
     }
   }, [user]);
 
-  const fetchUserData = async () => {
-    if (!user?.email) return;
+  const fetchMemberData = async () => {
+    if (!user?.id) return;
     
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('google-sheets', {
-        body: {
-          action: 'read',
-          email: user.email,
-        },
-      });
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (error) throw error;
 
-      if (data.found && data.userData) {
-        setUserData(data.userData);
+      if (data) {
+        setMemberData(data);
         setFormData({
-          tel: data.userData.tel || '',
-          topic: data.userData.topic || '',
-          keyword: data.userData.keyword || '',
-          title: data.userData.title || '',
-          igLink: data.userData.igLink || '',
+          tel: data.tel || '',
+          topic: data.topic || '',
+          keyword: data.keyword || '',
+          title: data.title || '',
+          igLink: data.ig_link || '',
         });
       } else {
-        setUserData(null);
-        toast.info('在表格中找不到您的資料');
+        setMemberData(null);
       }
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -81,23 +79,25 @@ export default function Dashboard() {
   };
 
   const handleSave = async () => {
-    if (!userData || !user?.email) return;
+    if (!memberData || !user?.id) return;
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke('google-sheets', {
-        body: {
-          action: 'update',
-          email: user.email,
-          rowIndex: userData.rowIndex,
-          data: formData,
-        },
-      });
+      const { error } = await supabase
+        .from('members')
+        .update({
+          tel: formData.tel,
+          topic: formData.topic,
+          keyword: formData.keyword,
+          title: formData.title,
+          ig_link: formData.igLink,
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
       toast.success('資料已更新！');
-      await fetchUserData();
+      await fetchMemberData();
     } catch (err) {
       console.error('Error saving data:', err);
       toast.error('儲存失敗，請稍後再試');
@@ -147,12 +147,12 @@ export default function Dashboard() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
                 <CardTitle className="font-display text-xl">我的資料</CardTitle>
-                <CardDescription>查看和編輯您在表格中的資料</CardDescription>
+                <CardDescription>查看和編輯您的會員資料</CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={fetchUserData}
+                onClick={fetchMemberData}
                 disabled={loading}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -163,16 +163,16 @@ export default function Dashboard() {
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
-              ) : !userData ? (
+              ) : !memberData ? (
                 <div className="text-center py-12">
                   <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
                     <User className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground">
-                    在表格中找不到您的電郵地址
+                    找不到您的會員資料
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    請確認您使用的電郵與表格中的一致
+                    請聯繫管理員
                   </p>
                 </div>
               ) : (
@@ -184,7 +184,7 @@ export default function Dashboard() {
                       電郵 (不可修改)
                     </Label>
                     <Input
-                      value={userData.email}
+                      value={memberData.email}
                       disabled
                       className="bg-muted"
                     />
