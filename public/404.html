@@ -8,17 +8,16 @@
     <script>
       // GitHub Pages SPA fallback (handles refresh on /auth, /dashboard, etc.)
       (function () {
-        var base = "/database1";
         var l = window.location;
+
+        // Works for project pages (/<repo>/...) and root domains.
+        var firstSegment = l.pathname.split("/").filter(Boolean)[0] || "";
+        var base = firstSegment ? "/" + firstSegment : "";
 
         // Strip base prefix if present
         var path = l.pathname.indexOf(base + "/") === 0 ? l.pathname.slice(base.length) : l.pathname;
 
-        var target =
-          base +
-          "/?p=" +
-          encodeURIComponent(path + l.search + l.hash);
-
+        var target = base + "/?p=" + encodeURIComponent(path + l.search + l.hash);
         l.replace(target);
       })();
     </script>
