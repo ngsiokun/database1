@@ -21,6 +21,23 @@
 
   <body>
     <div id="root"></div>
+
+    <script>
+      // GitHub Pages SPA fallback companion:
+      // If we were redirected from /404.html with ?p=..., restore the original path.
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var p = params.get("p");
+        if (!p) return;
+
+        // Keep the base path (e.g. /database1/) and append the original route.
+        var base = window.location.pathname.replace(/\/$/, "");
+        var target = base + decodeURIComponent(p);
+
+        window.history.replaceState(null, "", target);
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
