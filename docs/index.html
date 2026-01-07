@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CatMan AI - 會員資料庫</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 48px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            text-align: center;
+        }
+
+        .cat-icon {
+            font-size: 80px;
+            margin-bottom: 24px;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .logo {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            font-size: 18px;
+            margin-bottom: 32px;
+        }
+
+        .description {
+            color: #374151;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-top: 32px;
+            text-align: left;
+        }
+
+        .feature {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .footer {
+            margin-top: 32px;
+            color: #9ca3af;
+            font-size: 14px;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="cat-icon">🐱</div>
+        <h1 class="logo">CatMan AI</h1>
+        <p class="subtitle">會員資料庫管理系統</p>
+        
+        <p class="description">
+            智能化的會員資料管理平台，支援 Google Sheets 同步，讓您輕鬆管理所有會員資訊。
+        </p>
+
+        <a href="https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID" class="btn">
+            進入系統 →
+        </a>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <div class="feature-title">Google Sheets 同步</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <div class="feature-title">安全驗證</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">✏️</div>
+                <div class="feature-title">即時編輯</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-title">響應式設計</div>
+            </div>
+        </div>
+
+        <p class="footer">© 2025 CatMan AI. All rights reserved.</p>
+    </div>
+</body>
+</html>
